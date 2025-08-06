@@ -24,10 +24,11 @@ def antenna_time_plot(data_dict, frequencies, title):
         data = np.array(data, dtype=object)
         max_len = max(len(sublist) for sublist in data)
         padded_data = np.array([np.pad(sublist, (0, max_len - len(sublist)), constant_values=np.nan) for sublist in data], dtype = float)
-        medians = np.nanmedian(padded_data, axis=0)
-        lower_quartiles = np.nanpercentile(padded_data, 25, axis=0)
-        upper_quartiles = np.nanpercentile(padded_data, 75, axis=0)
-        return max_len, medians, lower_quartiles, upper_quartiles
+        means = np.nanmean(padded_data, axis=0)
+        stds = np.nanstd(padded_data, axis=0)
+        lower = means - stds     # One std dev below the mean
+        upper = means + stds     # One std dev above the mean
+        return max_len, means, lower, upper
 
     axes_flat = axes.flatten()
 
@@ -118,8 +119,9 @@ def get_max_values(lateral_vel, fwd_vel, body_angle, ang_vel):
                 during_stim = list[int(0.15/1.15*len(list)):int(0.65/1.15*len(list))]
                 if key not in dict: 
                     dict[key]  = []
-                if key[0] == "Right": 
-                    dict[key].append(min(during_stim))
+                if key[0] == "Right":    
+                    print(min(during_stim))                  
+                    dict[key].append(min(during_stim)) 
                 elif key[0] == "Left": 
                     dict[key].append(max(during_stim))
                 elif key[0] == "Both":
@@ -144,9 +146,12 @@ def frequency_plot(data_dict, frequencies, title):
 
     # Iterate through frequencies and collect data
     for idx, freq in enumerate(frequencies):
+
         list1 = data_dict.get(("Right", freq), [])
         list2 = data_dict.get(("Left", freq), [])
-
+        if freq == 20 or freq == 10: 
+            print("freq", freq, "Right", list1)
+            print("freq", freq, "Left", list2)
         if len(list1) > 0:  # Add "Right" data if available
             box_data.append(list1)
             positions.append(freq)  # X-axis position corresponds to frequency

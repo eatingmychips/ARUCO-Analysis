@@ -4,7 +4,7 @@ import numpy as np
 from scipy import stats
 import ast
 from os import listdir
-
+import math
 
 def file_read(file):
     """Reads in a single csv file, with 3 columns: time, pose (position of the insect, structured as 
@@ -379,3 +379,54 @@ def success_rate(forward_velocity, body_angles, vel_thresh=0.2, angle_thresh=2):
                 body_angle_success.append(0)
 
     return fwd_vel_success, body_angle_success
+
+
+def angle_interpolate(values): 
+    angles_deg = [math.degrees(x) if x is not None else float('nan') for x in values]
+    arr = np.array(angles_deg, dtype = np.float64)
+    nans = np.isnan(arr)
+    if nans.any(): 
+        arr[nans] = np.interp(np.flatnonzero(nans), np.flatnonzero(~nans), arr[~nans])
+
+    return arr.tolist()
+
+
+def pos_interpolate(pos):
+    """
+    pos: list of [x, y] (with values or None)
+    Returns a list of [x, y] with None values interpolated.
+    """
+    pos_array = np.array([
+        [v if v is not None else np.nan for v in pt]
+        for pt in pos
+    ], dtype=np.float64)  # shape (n, 2)
+
+    # Interpolate x and y independently
+    for i in range(2):  # For x and y
+        col = pos_array[:, i]
+        nans = np.isnan(col)
+        if nans.any() and (~nans).any():
+            col[nans] = np.interp(
+                np.flatnonzero(nans),
+                np.flatnonzero(~nans),
+                col[~nans]
+            )
+        pos_array[:, i] = col
+
+    # Convert back to list of lists
+    return pos_array.tolist()
+
+
+def trial_is_outlier(angles, key): 
+    side = key[0]
+    if side == "Right": 
+        for angle in angles: 
+            if angle > 30: 
+                return True
+    elif side == "Left": 
+        for angle in angles: 
+            if angle < -30: 
+                return True 
+    else: 
+        return False
+    

@@ -23,7 +23,7 @@ def find_csv_filenames( path_to_dir, suffix=".csv" ):
 
 
 #TODO: Enter your file path here:
-file_path = r"G:\biorobotics\data\ClosedLoopControl\MiscDataCollection\500msDuration"
+file_path = r"G:\biorobotics\data\Lachie\Misc. Code\FileRestruacturing\Output"
 
 files = [file_path + "\\" + x
             for x in find_csv_filenames(file_path)]
@@ -47,9 +47,8 @@ def stat_analysis(files):
     elytra_trial_no = 0
 
     for file in files: 
-        
+        print(file)
         parts, stim_deets, stim_occur, fps = file_read(file)
-        print(fps)
         stim_dict = get_post_stim(parts, stim_deets, stim_occur, fps)
         turning_trial_no += sum(1 for k in stim_dict if k[0] == "Right")
         turning_trial_no += sum(1 for k in stim_dict if k[0] == "Left")
@@ -59,8 +58,11 @@ def stat_analysis(files):
         for key, value in stim_dict.items(): 
             for pose_lst in value: 
                 angles = [item[2] for item in pose_lst]
-                angles = [math.degrees(x) for x in angles]
+                angles = angle_interpolate(angles)
+                #TODO: Clean up outlier trial
+                
                 pos = [[item[0], item[1]] for item in pose_lst]
+                pos = pos_interpolate(pos)
                 #Get middle and bottom points
                 pos = remove_outliers_and_smooth(pos, alpha=0.2, z_thresh=2.5)
                 angles = remove_outliers_and_smooth_1d(angles, alpha=0.2, z_thresh=2.5)
@@ -80,6 +82,7 @@ def stat_analysis(files):
                 body_angles[key].append(body_angle)
                 angular_velocity[key].append(ang_vel)
 
+
     print("Number of Turning Trials is: ", turning_trial_no)
     print("Number of Forward Trials is: ", elytra_trial_no)
     
@@ -93,7 +96,6 @@ lateral_velocity, forward_velocity, body_angles, angular_velocity = stat_analysi
 
 ### CALL PLOTTNG FUNCTIONS ###
 lateral_max, fwd_max, angles_max, ang_vel_max = get_max_values(lateral_velocity, forward_velocity, body_angles, angular_velocity)
-
 
 # Call all time based plots
 # antenna_time_plot(lateral_velocity, frequencies, 'Lateral velocity\n(mm/s)')

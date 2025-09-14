@@ -23,11 +23,14 @@ def antenna_time_plot(data_dict, frequencies, title):
     def process_list(data):
         data = np.array(data, dtype=object)
         max_len = max(len(sublist) for sublist in data)
-        padded_data = np.array([np.pad(sublist, (0, max_len - len(sublist)), constant_values=np.nan) for sublist in data], dtype = float)
-        means = np.nanmean(padded_data, axis=0)
-        stds = np.nanstd(padded_data, axis=0)
-        lower = means - stds     # One std dev below the mean
-        upper = means + stds     # One std dev above the mean
+
+        resampled_data = np.array([
+        resample_1d_list(sublist, max_len) for sublist in data
+            ], dtype=float)
+        means = np.nanmean(resampled_data, axis=0)
+        stds = np.nanstd(resampled_data, axis=0)
+        lower = means -  stds     # One std dev below the mean
+        upper = means +  stds     # One std dev above the mean
         return max_len, means, lower, upper
 
     axes_flat = axes.flatten()
@@ -97,6 +100,20 @@ def antenna_time_plot(data_dict, frequencies, title):
     
     plt.tight_layout(h_pad=0.35)
     plt.show()
+    
+def resample_1d_list(original_list, new_len):
+    # Remove invalid (non-float) entries
+    filtered = [x for x in original_list if isinstance(x, (float, int, np.float32, np.float64))]
+    old_len = len(filtered)
+    if old_len == 0:
+        # Return a list of np.nan if no valid numbers remain
+        return [np.nan] * new_len
+    if old_len == 1:
+        return [filtered] * new_len
+    old_idx = np.linspace(0, 1, old_len)
+    new_idx = np.linspace(0, 1, new_len)
+    return np.interp(new_idx, old_idx, filtered).tolist()
+
 
 def get_max_values(lateral_vel, fwd_vel, body_angle, ang_vel):
 
@@ -119,14 +136,13 @@ def get_max_values(lateral_vel, fwd_vel, body_angle, ang_vel):
                 during_stim = list[int(0.15/1.15*len(list)):int(0.65/1.15*len(list))]
                 if key not in dict: 
                     dict[key]  = []
-                if key[0] == "Right":    
-                    print(min(during_stim))                  
+                if key[0] == "Right":           
                     dict[key].append(min(during_stim)) 
                 elif key[0] == "Left": 
                     dict[key].append(max(during_stim))
                 elif key[0] == "Both":
                     if dict is fwd_vel_max:
-                        dict[key].append(abs(max(during_stim)))
+                        dict[key].append(abs(max(list)))
                     else:
                         dict[key].append(max(during_stim, key=abs))
 
@@ -149,9 +165,6 @@ def frequency_plot(data_dict, frequencies, title):
 
         list1 = data_dict.get(("Right", freq), [])
         list2 = data_dict.get(("Left", freq), [])
-        if freq == 20 or freq == 10: 
-            print("freq", freq, "Right", list1)
-            print("freq", freq, "Left", list2)
         if len(list1) > 0:  # Add "Right" data if available
             box_data.append(list1)
             positions.append(freq)  # X-axis position corresponds to frequency
@@ -164,7 +177,7 @@ def frequency_plot(data_dict, frequencies, title):
 
     # Plot the boxplots
     boxplots = ax.boxplot(box_data, positions=positions, patch_artist=True, widths = 3.5)
-
+    ax.axhline(y = 0, color = 'black', linestyle = '--', linewidth = 2)
     # Customize boxplot colors
     for patch, color in zip(boxplots['boxes'], colors):
         patch.set_facecolor(color)
@@ -198,13 +211,17 @@ def elytra_time_plot(data_dict, frequencies, title):
     fig, axes = plt.subplots(2, 3, figsize=(12, 8))
 
     def process_list(data):
-        data = np.array(data, dtype=object)
-        max_len = max(len(sublist) for sublist in data)
-        padded_data = np.array([np.pad(sublist, (0, max_len - len(sublist)), constant_values=np.nan) for sublist in data], dtype = float)
-        medians = np.nanmedian(padded_data, axis=0)
-        lower_quartiles = np.nanpercentile(padded_data, 25, axis=0)
-        upper_quartiles = np.nanpercentile(padded_data, 75, axis=0)
-        return max_len, medians, lower_quartiles, upper_quartiles
+            data = np.array(data, dtype=object)
+            max_len = max(len(sublist) for sublist in data)
+
+            resampled_data = np.array([
+            resample_1d_list(sublist, max_len) for sublist in data
+                ], dtype=float)
+            means = np.nanmean(resampled_data, axis=0)
+            stds = np.nanstd(resampled_data, axis=0)
+            lower = means - stds     # One std dev below the mean
+            upper = means + stds     # One std dev above the mean
+            return max_len, means, lower, upper
 
     axes_flat = axes.flatten()
     for idx, freq in enumerate(frequencies):
@@ -313,17 +330,22 @@ def frequency_plot_elytra(data_dict, frequencies, title):
 
 
 def antenna_time_plot_single(data_dict, frequency, title):
-    fig, ax = plt.subplots(figsize=(12, 8), dpi=100)
+    fig, ax = plt.subplots(figsize=(9, 6), dpi=100)
 
     def process_list(data):
         data = np.array(data, dtype=object)
         max_len = max(len(sublist) for sublist in data)
-        padded_data = np.array([np.pad(sublist, (0, max_len - len(sublist)), constant_values=np.nan) for sublist in data], dtype=float)
-        medians = np.nanmedian(padded_data, axis=0)
-        lower_quartiles = np.nanpercentile(padded_data, 25, axis=0)
-        upper_quartiles = np.nanpercentile(padded_data, 75, axis=0)
-        return max_len, medians, lower_quartiles, upper_quartiles
 
+        resampled_data = np.array([
+        resample_1d_list(sublist, max_len) for sublist in data
+            ], dtype=float)
+        means = np.nanmean(resampled_data, axis=0)
+        stds = np.nanstd(resampled_data, axis=0)
+        lower = means - stds     # One std dev below the mean
+        upper = means + stds     # One std dev above the mean
+        return max_len, means, lower, upper
+
+    
     # Use .get() with default empty list if key not found
     list1 = data_dict.get(("Right", frequency), [])
     list2 = data_dict.get(("Left", frequency), [])
@@ -345,54 +367,58 @@ def antenna_time_plot_single(data_dict, frequency, title):
 
     # Right stimulation plot
     ax.fill_between(x[:len(medians1)], lower_quartiles1, upper_quartiles1,
-                    color='lightgrey', alpha=0.3)
+                    color='darkgrey', alpha=0.3)
     ax.plot(x[:len(medians1)], medians1, color='black', linewidth=2)
     ax.fill_between(x[:len(medians1)][mask], lower_quartiles1[mask], upper_quartiles1[mask],
                     color='lightcoral', alpha=0.3)
     ax.plot(x[:len(medians1)][mask], medians1[mask],
-            color='red', linewidth=2, label='Right Stim.')
+            color='red', linewidth=2, label='Right Stim - Inv')
 
     # Left stimulation plot
     ax.fill_between(x[:len(medians2)], lower_quartiles2, upper_quartiles2,
-                    color='lightgrey', alpha=0.3)
+                    color='darkgrey', alpha=0.3)
     ax.plot(x[:len(medians2)], medians2,
             color='black', linewidth=2)
     
     ax.fill_between(x[:len(medians2)][mask], lower_quartiles2[mask], upper_quartiles2[mask],
                     color='lightgreen', alpha=0.3)
     ax.plot(x[:len(medians2)][mask], medians2[mask],
-            color='green', linewidth=2, label='Left Stim.')
+            color='green', linewidth=2, label='Left Stim - Inv')
 
     # ax.set_title(f'Freq: {frequency} Hz', fontsize=18)
     
-    ax.set_ylabel(title, fontsize=16)
-    ax.legend(fontsize=14, loc="upper left")
+    ax.set_ylabel(title, fontsize=21)
+    ax.legend(fontsize=16, loc="upper left")
 
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
 
-    ax.set_xlabel('Time (s)', fontsize=16)
+    ax.set_xlabel('Time (s)', fontsize=21)
     xtick_positions = np.arange(0, 0.85, 0.2)
     xtick_labels = [f"{tick:.1f}" for tick in xtick_positions]
     ax.set_xticks(xtick_positions)
-    ax.set_xticklabels(xtick_labels)
+    ax.set_xticklabels(xtick_labels, fontsize = 19)
     ax.set_xlim(0, 0.85)
-    ax.tick_params(axis='both', which='major', labelsize=16)
+    ax.tick_params(axis='both', which='major', labelsize=19)
     plt.tight_layout(h_pad=0.35)
     plt.show()
 
 
 def elytra_time_plot_single(data_dict, frequency, title):
-    fig, ax = plt.subplots(figsize=(12, 8), dpi=100)
+    fig, ax = plt.subplots(figsize=(9, 6), dpi=100)
 
     def process_list(data):
         data = np.array(data, dtype=object)
         max_len = max(len(sublist) for sublist in data)
-        padded_data = np.array([np.pad(sublist, (0, max_len - len(sublist)), constant_values=np.nan) for sublist in data], dtype=float)
-        medians = np.nanmedian(padded_data, axis=0)
-        lower_quartiles = np.nanpercentile(padded_data, 25, axis=0)
-        upper_quartiles = np.nanpercentile(padded_data, 75, axis=0)
-        return max_len, medians, lower_quartiles, upper_quartiles
+
+        resampled_data = np.array([
+        resample_1d_list(sublist, max_len) for sublist in data
+            ], dtype=float)
+        means = np.nanmean(resampled_data, axis=0)
+        stds = np.nanstd(resampled_data, axis=0)
+        lower = means - stds     # One std dev below the mean
+        upper = means + stds     # One std dev above the mean
+        return max_len, means, lower, upper
 
     # Use .get() with default empty list if key not found
     list1 = data_dict.get(("Both", frequency), [])
@@ -413,17 +439,17 @@ def elytra_time_plot_single(data_dict, frequency, title):
 
     # Both Elytra Stimulation plot
     ax.fill_between(x[:len(medians1)], lower_quartiles1, upper_quartiles1,
-                    color='lightgrey', alpha=0.3)
+                    color='darkgrey', alpha=0.3)
     ax.plot(x[:len(medians1)], medians1, color='black', linewidth=2)
     ax.fill_between(x[:len(medians1)][mask], lower_quartiles1[mask], upper_quartiles1[mask],
                     color='lightcoral', alpha=0.3)
     ax.plot(x[:len(medians1)][mask], medians1[mask],
-            color='red', linewidth=2, label='Elytra Stim.')
+            color='red', linewidth=2, label='Both Elytra Stim.')
 
     # ax.set_title(f'Freq: {frequency} Hz', fontsize=18)
     ax.set_xlim(0, 0.85)
-    ax.set_ylabel(title, fontsize=16)
-    ax.set_xlabel('Time (s)', fontsize=16)
+    ax.set_ylabel(title, fontsize=21)
+    ax.set_xlabel('Time (s)', fontsize=21)
     ax.legend(fontsize=14)
 
     ax.spines['right'].set_visible(False)
@@ -433,8 +459,8 @@ def elytra_time_plot_single(data_dict, frequency, title):
     xtick_positions = np.arange(0, 0.85, 0.2)
     xtick_labels = [f"{tick:.1f}" for tick in xtick_positions]
     ax.set_xticks(xtick_positions)
-    ax.set_xticklabels(xtick_labels, fontsize=16)
-    ax.tick_params(axis='y', which='major', labelsize=16)  # Increase y-tick label size
+    ax.set_xticklabels(xtick_labels, fontsize=19)
+    ax.tick_params(axis='y', which='major', labelsize=19)  # Increase y-tick label size
 
     plt.tight_layout(h_pad=0.35)
     plt.show()
@@ -547,4 +573,38 @@ def elytra_trials_plot(data_dict, frequencies, title):
             axes_flat[i].set_xticklabels(xtick_labels)
 
     plt.tight_layout(h_pad=0.35)
+    plt.show()
+
+
+
+def plot_success_rate_bar(fwd_vel_success, body_angle_success):
+    # Calculate success rates as percentages
+    fwd_vel_rate = np.mean(fwd_vel_success) * 100
+    body_angle_rate = np.mean(body_angle_success) * 100
+    print(fwd_vel_rate)
+    print(body_angle_rate)
+    categories = ['Turning', 'Forward']
+
+    success_rates = [body_angle_rate, fwd_vel_rate]
+
+    
+    fig, ax = plt.subplots(figsize=(12, 8))
+    bars = ax.bar(categories, success_rates, color=['lightgrey', 'darkgrey'], width=0.3)
+
+    # Annotate bars with percentage values
+    for bar in bars:
+        height = bar.get_height()
+        ax.annotate(f'{height:.1f}%',
+                    xy=(bar.get_x() + bar.get_width() / 2, height),
+                    xytext=(0, 3),  # vertical offset
+                    textcoords="offset points",
+                    ha='center', va='bottom', fontsize=14)
+
+    ax.set_ylim(0, 100)
+    ax.set_ylabel('Success Rate (%)', fontsize=16)
+    ax.tick_params(axis = 'both', which = 'major', labelsize = 16)
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+
+    plt.tight_layout()
     plt.show()

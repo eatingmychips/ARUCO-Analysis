@@ -160,12 +160,11 @@ def remove_outliers_and_smooth_1d(data, alpha=0.1, z_thresh=2):
     return smooth.tolist()
 
 
-def body_vel(middle, bottom, fps):
+def body_vel(pos, angles, fps):
     """Calculate the in-line and transverse velocities of the beetle.
     
     Args:
-        middle (list): positional data for the middle point of beetle
-        bottom (list): positional data for the bottom point of beetle
+        pos: position as [[x, y], [x1, y1], .....]
         fps (int): frames per second that the data has been recorded at. 
     
     Returns:
@@ -176,22 +175,14 @@ def body_vel(middle, bottom, fps):
     body_v_in_line = []
     body_v_transverse = []
 
-    # Define vertical axis for determining lateral direction (assuming 2D plane)
-    vertical_axis = np.array([0, 1])
-
-    for i in range(3, len(middle)):
+    for i in range(1, len(pos)):
         # Velocity vector of middle point
-        delta = np.subtract(middle[i], middle[i-2])
+        delta = np.subtract(pos[i-1], pos[i])
 
-        # Body axis (direction from bottom to middle)
-        body_axis = np.subtract(middle[i], bottom[i])
-        body_axis_norm = np.linalg.norm(body_axis)
-
-        # Normalize body axis
-        if body_axis_norm := np.linalg.norm(body_axis):
-            body_axis_unit = body_axis / body_axis_norm
-        else:
-            body_axis_unit = np.zeros_like(body_axis)
+        
+        fwd_vector = [np.cos(np.radians(angles[i])), np.sin(np.radians(angles[i]))]
+        norm = np.linalg.norm(fwd_vector)
+        body_axis_unit = fwd_vector / norm
 
         # Calculate perpendicular vector to body axis (rotated 90 degrees CCW)
         perp_body_axis_unit = np.array([-body_axis_unit[1], body_axis_unit[0]])
@@ -200,8 +191,8 @@ def body_vel(middle, bottom, fps):
         in_line_velocity = np.dot(delta, body_axis_unit)
         transverse_velocity = np.dot(delta, perp_body_axis_unit)
 
-        # Scale velocities
-        scale_factor = fps / body_axis_norm if body_axis_norm != 0 else 0
+        pixels_per_mm = 4.1033
+        scale_factor = fps/pixels_per_mm
         body_v_in_line.append(in_line_velocity * scale_factor)
         body_v_transverse.append(transverse_velocity * scale_factor)
 
@@ -210,7 +201,7 @@ def body_vel(middle, bottom, fps):
         body_v_transverse.append(lateral_velocity_signed)
 
     # Exponential smoothing
-    alpha = 0.5
+    alpha = 0.25
     body_v_in_line = pd.Series(body_v_in_line).ewm(alpha=alpha, adjust=False).mean()
     body_v_in_line = round(body_v_in_line, 5).tolist()
     
@@ -341,7 +332,7 @@ def statistical_significance(data1, data2):
 
 
             
-def success_rate(forward_velocity, body_angles, vel_thresh=0.2, angle_thresh=2):
+def success_rate(forward_velocity, body_angles, vel_thresh=2, angle_thresh=4):
     """
     Args:
         forward_velocity, body_angles: dicts of lists (trials) per key
@@ -355,28 +346,37 @@ def success_rate(forward_velocity, body_angles, vel_thresh=0.2, angle_thresh=2):
 
     # Helper function to compute baseline and during-stim medians
     def get_medians(trace):
-        n = len(trace)
-        pre_stim = trace[:int(0.15/1.15*n)]
-        during_stim = trace[int(0.15/1.15*n):int(0.65/1.15*n)]
-        return abs(np.mean(pre_stim)), abs(np.mean(during_stim))
+        during_stim = trace[int(0.15/1.15*len(trace)):int(0.65/1.15*len(trace))]
+        dur_stim = [abs(x) for x in during_stim]
+        return 0, max(dur_stim) 
 
     # Forward velocity
     for key, trials in forward_velocity.items():
         for trial in trials:
-            base, stim = get_medians(trial)
-            if stim - base >= vel_thresh:
-                fwd_vel_success.append(1)
-            else:
-                fwd_vel_success.append(0)
+            if key[0] == "Both":
+                base, stim = get_medians(trial)
+                
+                if stim - base >= vel_thresh:
+                    
+                    fwd_vel_success.append(1)
+                else:
+                    fwd_vel_success.append(0)
+            else: 
+                continue
 
     # Body angle
     for key, trials in body_angles.items():
         for trial in trials:
-            base, stim = get_medians(trial)
-            if abs(stim - base) >= angle_thresh:
-                body_angle_success.append(1)
-            else:
-                body_angle_success.append(0)
+            if key[0] == "Right" or key[0] == "Left":
+                base, stim = get_medians(trial)
+                if abs(stim - base) >= angle_thresh:
+                    body_angle_success.append(1)
+                else:
+                    print(key[1], stim)
+                    print(trial)
+                    body_angle_success.append(0)
+            else: 
+                continue
 
     return fwd_vel_success, body_angle_success
 
@@ -418,15 +418,16 @@ def pos_interpolate(pos):
 
 
 def trial_is_outlier(angles, key): 
-    side = key[0]
-    if side == "Right": 
-        for angle in angles: 
-            if angle > 30: 
-                return True
-    elif side == "Left": 
-        for angle in angles: 
-            if angle < -30: 
-                return True 
-    else: 
-        return False
+    for i in range(len(angles) - 5): 
+        if abs(angles[i] - angles[i+5]) > 40: 
+            return True 
+    
+    if key[0] == "Right": 
+        if angles[-1] > 10: 
+            return True 
+    if key[0] == "Left": 
+        if angles[-1] < -10: 
+            return True
+        
+    return False
     
